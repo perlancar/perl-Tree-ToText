@@ -138,7 +138,7 @@ Sample output:
 
 =head1 FUNCTIONS
 
-=head2 render_tree_as_text_lines([ \%opts, ] $tree) => str
+=head2 render_tree_as_text([ \%opts, ] $tree) => str
 
 This function renders a tree object C<$tree> as lines of text, each line showing
 the ID or attributes of a node. Each line will be indented differently according
