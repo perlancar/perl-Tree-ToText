@@ -64,7 +64,7 @@ sub _render {
     $res .= "\n";
 
     my @children = $node->children;
-    @children = () if @children && !defined($children[0]);
+    @children = () unless defined($children[0]);
     @children = @{$children[0]} if @children==1 && ref($children[0]) eq 'ARRAY';
     my @children_res;
 
