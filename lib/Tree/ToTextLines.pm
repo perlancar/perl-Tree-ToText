@@ -135,29 +135,58 @@ sub render_tree_as_text {
 
  my $tree = ...; # you can build a tree e.g. using Tree::FromStruct or Tree::FromTextLines
 
+Using default option:
+
+ print render_tree_as_text($tree);
+
+Sample output:
+
+ Tree::Example::HashNode=HASH(0xca80e0)
+   Tree::Example::HashNode::Sub1=HASH(0xbd8c10)
+     Tree::Example::HashNode::Sub2=HASH(0xd8b518)
+       Tree::Example::HashNode::Sub1=HASH(0xd8b710)
+         Tree::Example::HashNode::Sub2=HASH(0xd8bc50)
+       Tree::Example::HashNode::Sub1=HASH(0xd8b788)
+       Tree::Example::HashNode::Sub1=HASH(0xd8b830)
+       Tree::Example::HashNode::Sub1=HASH(0xd8b8d8)
+   Tree::Example::HashNode::Sub1=HASH(0xd8b3b0)
+     Tree::Example::HashNode::Sub2=HASH(0xd8b620)
+       Tree::Example::HashNode::Sub1=HASH(0xd8b980)
+         Tree::Example::HashNode::Sub2=HASH(0xd8bce0)
+       Tree::Example::HashNode::Sub1=HASH(0xd8ba58)
+       Tree::Example::HashNode::Sub1=HASH(0xd8bb00)
+       Tree::Example::HashNode::Sub1=HASH(0xd8bba8)
+   Tree::Example::HashNode::Sub1=HASH(0xd8b470)
+
+Customize options:
+
  print render_tree_as_text({
      #indent               => 2,
      show_guideline        => 1,        # default: 0
      id_attribute          => 'id',     # default: undef
-     show_attribute_name   => 0,        # default: 1
-     #show_class_name      => 1,
+     #show_attribute_name  => 1,
+     #show_class_name      => 0,
      #extra_attributes     => [..., ...], # default: undef
  }, $tree);
 
 Sample output:
 
- root
- |-- child1
- |   \-- grandc1
- |-- child2
- |-- child3
- |   |-- grandc2
- |   |-- grandc3
- |   |  |-- grandgrandc1
- |   |  \-- grandgrandc2
- |   |-- grandc4
- |   \-- grandc5
- \-- child4
+ id:1
+ |-- id:2
+ |   \-- id:5
+ |       |-- id:7
+ |       |   \-- id:15
+ |       |-- id:8
+ |       |-- id:9
+ |       \-- id:10
+ |-- id:3
+ |   \-- id:6
+ |       |-- id:11
+ |       |   \-- id:16
+ |       |-- id:12
+ |       |-- id:13
+ |       \-- id:14
+ \-- id:4
 
 
 =head1 DESCRIPTION
