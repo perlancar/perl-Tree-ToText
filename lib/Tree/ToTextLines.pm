@@ -7,11 +7,33 @@ use 5.010001;
 use strict;
 use warnings;
 
+use Data::Dmp;
+use Scalar::Util qw(reftype looks_like_number);
+
 use Exporter qw(import);
 our @EXPORT_OK = qw(render_tree_as_text);
 
-sub _render {
-    my ($opts, $node, $is_last_childs) = @_;
+sub _render_attr {
+    my ($node, $attr) = @_;
+
+    my $val;
+    if ($attr =~ /\A\w+\z/ && $node->can($attr)) {
+        $val = $node->$attr;
+    } elsif (reftype($node) eq 'HASH' && exists $node->{$attr}) {
+        $val = $node->{$attr};
+    } else {
+        $val = undef;
+    }
+
+    if (!defined($val) || ref($val) || !looks_like_number($val)) {
+        $val = dmp($val);
+    }
+
+    $val;
+}
+
+sub _render_node {
+    my ($opts, $node, $seniority, $is_last_childs) = @_;
 
     my $level = @$is_last_childs;
 
@@ -32,36 +54,39 @@ sub _render {
         }
     }
 
-    # show attributes
-    {
-        my $id;
-        if (defined (my $meth = $opts->{id_attribute})) {
-            $id = ($opts->{show_attribute_name} ? "$meth:" : "") . $node->$meth;
-        } else {
-            $id = "$node";
-        }
-        $id =~ s/\R.*//s;
-        $res .= $id;
+    my $node_res;
+    if ($opts->{on_show_node}) {
+        $node_res = $opts->{on_show_node}->(
+            $node, $level, $seniority,
+            @$is_last_childs == 0 ? 1 : $is_last_childs->[-1],
+            $opts);
+    } else {
+        $node_res = "";
 
-        # XXX show class name
         if ($opts->{show_class_name}) {
             my $class = ref($node);
-            $res .= " " .
-                ($opts->{show_attribute_name} ? "_class:":"") .
-                $class;
+            $node_res .= "($class) ";
         }
 
-        # XXX show extra attributes
+        my $id;
+        if (defined (my $attr = $opts->{id_attribute})) {
+            $id = ($opts->{show_attribute_name} ? "$attr:" : "") .
+                _render_attr($node, $attr);
+        } else {
+            $id = "$node";
+            $id =~ s/\R.*//s;
+        }
+        $node_res .= $id;
+
         if ($opts->{extra_attributes}) {
             for my $attr (@{ $opts->{extra_attributes} }) {
-                my $v = $node->$attr;
-                $v =~ s/\R.*//s;
-                $res .= " ".($opts->{show_attribute_name} ? "$attr:" : "") . $v;
+                my $v = ($opts->{show_attribute_name} ? "$attr:" : "").
+                    _render_attr($node, $attr);
+                $node_res .= " $v";
             }
         }
     }
-
-    $res .= "\n";
+    $res .= "$node_res\n";
 
     my @children = $node->children;
     @children = () unless defined($children[0]);
@@ -71,7 +96,8 @@ sub _render {
     for my $i (0..$#children) {
         my $is_last_child = $i == $#children ? 1:0;
         push @children_res,
-            _render($opts, $children[$i], [@$is_last_childs, $is_last_child]);
+            _render_node(
+                $opts, $children[$i], $i, [@$is_last_childs, $is_last_child]);
     }
 
     ($res, @children_res);
@@ -85,20 +111,20 @@ sub render_tree_as_text {
     } else {
         $opts = {};
     }
+
     $opts->{indent} //= 2;
     $opts->{show_guideline} //= 0;
+    $opts->{on_show_node} //= undef;
+
     $opts->{id_attribute} //= undef;
     $opts->{show_attribute_name} //= 1;
-    $opts->{show_class_name} //= $opts->{id_attribute} ? 1:0;
+    $opts->{show_class_name} //= 0;
     $opts->{extra_attributes} //= undef;
 
     my $tree = shift;
 
-    join("", _render($opts, $tree, []));
+    join("", _render_node($opts, $tree, 0, []));
 }
-
-# TODO: render each node as CSV line, LTSV line, JSON, or Perl hash for greater
-# flexibility.
 
 1;
 # ABSTRACT: Render a tree object as indented text lines
@@ -110,12 +136,12 @@ sub render_tree_as_text {
  my $tree = ...; # you can build a tree e.g. using Tree::FromStruct or Tree::FromTextLines
 
  print render_tree_as_text({
-     #indent             => 2,
-     show_guideline      => 1,        # default: 0
-     id_attribute        => 'id',     # default: undef
-     show_attribute_name => 0,        # default: 1
-     show_class_name     => 0,        # default: 1
-     #extra_attributes => [..., ...], # default: undef
+     #indent               => 2,
+     show_guideline        => 1,        # default: 0
+     id_attribute          => 'id',     # default: undef
+     show_attribute_name   => 0,        # default: 1
+     #show_class_name      => 1,
+     #extra_attributes     => [..., ...], # default: undef
  }, $tree);
 
 Sample output:
@@ -142,9 +168,8 @@ Sample output:
 =head2 render_tree_as_text([ \%opts, ] $tree) => str
 
 This function renders a tree object C<$tree> as lines of text, each line showing
-the ID or attributes of a node. Each line will be indented differently according
-to the node's position. A child node will be indented more deeply than its
-parent node.
+a node and indented differently according to the node's position in the tree. A
+child node will be indented more deeply than its parent node.
 
 Tree object of any kind of class is accepted as long as the class responds to
 C<children> (see L<Role::TinyCommons::Tree::Node> for more details on the
@@ -153,6 +178,45 @@ requirement).
 This function is the complement for C<build_tree_from_text_lines> function in
 L<Tree::FromTextLines>.
 
+When C<on_show_node> option is specified, that routine will be called with
+C<($node, $level, $seniority, $is_last_child, $opts)> and the return value will
+be used to display each node. Otherwise, the default behavior to show each node
+is as follow:
+
+By default a node will be shown using:
+
+ "$node"
+
+that is, class name followed by its stringified value, which by default when not
+overloaded by the object will be something like:
+
+ Foo=HASH(0x1472160)
+
+If C<id_attribute> is specified, then instead the node will be shown using:
+
+ $node->id
+
+where C<id> is the name of the ID attribute.
+
+Rule to render value of attribute: If attribute name does not match C</\A\w+\z/>
+or a node does not respond to the getter method of that name, and the object is
+hash-based, then hash key of that name will be used instead. If said hash key
+does not exist also, C<undef> will be used. When displaying the value of an
+attribute, Data::Dmp will be used for non-number strings and references.
+
+After that, if C<extra_attributes> is set (e.g. to C<["foo", "bar"]>), will show
+the value of the attributes:
+
+ $node->id . " " . ref($node) . " " . $node->foo . " " . $node->bar
+
+The same rule for ID attribute will be used to render the value of these
+attributes.
+
+If C<show_class_name> is set to true, will prepend with class name in
+parentheses, e.g.:
+
+ ($class) ...
+
 Available options:
 
 =over
@@ -160,6 +224,24 @@ Available options:
 =item * indent => int (default: 2)
 
 Number of spaces for each indent level.
+
+=item * show_guideline => bool (default: 0)
+
+If set to false, then the tree will just a set of indented lines, e.g.:
+
+ id:1
+   id:2
+   id:3
+     id:4
+   id:5
+
+If set to true, guidelines will be shown, e.g.:
+
+ id:1
+ |-- id:2
+ |-- id:3
+ |   \-- id:4
+ \-- id:5
 
 =item * id_attribute => str (default: undef)
 
@@ -176,13 +258,65 @@ If ID attribute is used, the value of this attribute will be used instead, e.g.:
    id:node1
    id:node2
 
+=item * show_class_name => bool (default: 0)
+
+Whether to show class name before showing node, e.g. when false:
+
+ id:1
+   id:2
+   id:3
+     id:4
+   id:5
+
+When true:
+
+ (Tree::Object) id:1
+   (Tree::Object) id:2
+   (Tree::Object) id:3
+     (Tree::Object::Subclass) id:4
+   (Tree::Object) id:5
+
 =item * extra_attributes => array of str (default: undef)
 
-=item * show_class_name => bool (default: 1 or 0 if id_attribute is set)
+When specified, will show the extra attributes after the ID attribute and class
+name, e.g. when set to C<["foo","bar"]>:
+
+ id:1 foo:a bar:b
+   id:2 foo:c bar:b
+   id:3 foo: bar:d
+     id:4 foo:a2 bar:b2
+   id:5 foo:a bar:b
 
 =item * show_attribute_name => bool (default: 1)
 
-=item * show_guideline => bool (default: 0)
+When set to true, each time an attribute is shown its name will be printed
+first, e.g.:
+
+ id:1 foo:a bar:b
+   id:2 foo:c bar:b
+   id:3 foo: bar:d
+     id:4 foo:a2 bar:b2
+   id:5 foo:a bar:b
+
+When set to false:
+
+ 1 a b
+   2 c b
+   3  d
+     4 a2 b2
+   5 a b
+
+=item * on_show_node => code
+
+Can be used to completely customize how to display a node. It will be called
+with these arguments:
+
+ ($node, $level, $seniority, $is_last_child, $opts)
+
+where C<$level> is 0 for the root node, 1 for the root's children, and so on.
+C<$seniority> is 0 for the first child, 1 for the second, and so on.
+C<$is_last_child> will be set to true if node is the last child. The code should
+return a string that will be used to display a node.
 
 =back
 
