@@ -88,7 +88,9 @@ sub _render_node {
     }
     $res .= "$node_res\n";
 
-    my @children = $node->children;
+    my $children_method = $opts->{children_method} // 'children';
+
+    my @children = $node->$children_method;
     @children = () unless defined($children[0]);
     @children = @{$children[0]} if @children==1 && ref($children[0]) eq 'ARRAY';
     my @children_res;
@@ -201,8 +203,9 @@ a node and indented differently according to the node's position in the tree. A
 child node will be indented more deeply than its parent node.
 
 Tree object of any kind of class is accepted as long as the class responds to
-C<children> (see L<Role::TinyCommons::Tree::Node> for more details on the
-requirement).
+C<children> and the method returns a list or arrayref of children nodes. The
+name of the children method C<children> can be customized using
+C<children_method> option.
 
 This function is the complement for C<build_tree_from_text_lines> function in
 L<Tree::FromTextLines>.
@@ -249,6 +252,16 @@ parentheses, e.g.:
 Available options:
 
 =over
+
+=item * children_method => str (default: children)
+
+Example:
+
+ children_method => "get_children"
+
+By default, C<children> is the method that will be used on node objects to
+retrieve children nodes. But you can customize that using this option. Note that
+the method must return either a list or arrayref of nodes.
 
 =item * indent => int (default: 2)
 
