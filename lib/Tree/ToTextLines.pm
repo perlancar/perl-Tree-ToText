@@ -88,9 +88,9 @@ sub _render_node {
     }
     $res .= "$node_res\n";
 
-    my $children_method = $opts->{children_method} // 'children';
+    my $get_children_method = $opts->{get_children_method} // 'children';
 
-    my @children = $node->$children_method;
+    my @children = $node->$get_children_method;
     @children = () unless defined($children[0]);
     @children = @{$children[0]} if @children==1 && ref($children[0]) eq 'ARRAY';
     my @children_res;
@@ -205,7 +205,7 @@ child node will be indented more deeply than its parent node.
 Tree object of any kind of class is accepted as long as the class responds to
 C<children> and the method returns a list or arrayref of children nodes. The
 name of the children method C<children> can be customized using
-C<children_method> option.
+C<get_children_method> option.
 
 This function is the complement for C<build_tree_from_text_lines> function in
 L<Tree::FromTextLines>.
@@ -253,11 +253,11 @@ Available options:
 
 =over
 
-=item * children_method => str (default: children)
+=item * get_children_method => str (default: children)
 
 Example:
 
- children_method => "get_children"
+ get_children_method => "get_children"
 
 By default, C<children> is the method that will be used on node objects to
 retrieve children nodes. But you can customize that using this option. Note that
