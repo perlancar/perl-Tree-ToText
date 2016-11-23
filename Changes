@@ -1,5 +1,11 @@
 Revision history for Tree-ToText
 
+0.05    2016-11-23 (PERLANCAR)
+
+	- [Incompatible change] Rename children_method option to
+	  get_children_method.
+
+
 0.04    2016-11-21 (PERLANCAR)
 
 	- Allow customizing name of method to get children via
