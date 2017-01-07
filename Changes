@@ -1,5 +1,3 @@
-Revision history for Tree-ToText
-
 0.05    2016-11-23 (PERLANCAR)
 
 	- [Incompatible change] Rename children_method option to
